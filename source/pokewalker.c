@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <time.h>
 #include <3ds.h>
 
 #define clamp(x, min, max) x < min ? min : (x > max ? max : x)
@@ -129,6 +133,7 @@ bool poke_init_session(void)
 // Session must be already established
 bool poke_eeprom_write(u16 addr, const void *data, u16 size)
 {
+	if (!data || !size || (u32)addr + size > 0x10000u) return false;
 	poke_packet pkt_write, pkt_write_ack;
 	u8 buf[MAX_PAYLOAD_SIZE];
 	int i = 0, buf_size = 0;
@@ -142,7 +147,9 @@ bool poke_eeprom_write(u16 addr, const void *data, u16 size)
 		create_poke_packet(&pkt_write, CMD_EEPROMWRITE, addr >> 8, buf, buf_size + 1);
 		send_pokepacket(&pkt_write);
 
-		if (!recv_pokepacket(&pkt_write_ack) || pkt_write_ack.header.opcode != CMD_EEPROMWRITE_ACK)
+		if (!recv_pokepacket(&pkt_write_ack) || pkt_write_ack.header.opcode != CMD_EEPROMWRITE_ACK ||
+			pkt_write_ack.header.session_id != inited_session_id || pkt_write_ack.payload_size != 0 ||
+			pkt_write_ack.header.extra != (u8)(addr >> 8))
 			return false;
 
 		i += buf_size;
@@ -158,16 +165,18 @@ bool poke_eeprom_write(u16 addr, const void *data, u16 size)
 // out buffer size must be of the appropriate size
 bool poke_eeprom_read(void *out, u16 addr, u8 size)
 {
+	if (!out || !size || size > MAX_PAYLOAD_SIZE || (u32)addr + size > 0x10000u) return false;
 	poke_packet pkt_req, pkt_ack;
 
 	u8 read_payload[] = {addr >> 8, addr & 0xFF, size};
 	create_poke_packet(&pkt_req, CMD_EEPROMREAD, MASTER_EXTRA, read_payload, sizeof(read_payload));
 	send_pokepacket(&pkt_req);
 
-	bool result = recv_pokepacket(&pkt_ack) && pkt_ack.header.opcode == CMD_EEPROMREAD_ACK;
+	bool result = recv_pokepacket(&pkt_ack) && pkt_ack.header.opcode == CMD_EEPROMREAD_ACK &&
+		pkt_ack.header.session_id == inited_session_id && pkt_ack.payload_size == size;
 
 	// pkt_ack.payload_size == len
-	if (result) memcpy(out, pkt_ack.payload, pkt_ack.payload_size);
+	if (result) memcpy(out, pkt_ack.payload, size);
 
 	return result;
 }
@@ -486,33 +495,38 @@ finish:
 
 void poke_dump_eeprom()
 {
-	u16 addr = 0;
-	u8 buf[0x80];
-
-	FILE *f = fopen("PWEEPROM.bin", "wb");
-	ir_enable();
-
-	if (!poke_init_session()) {
-		printf("Error while establishing session\n");
-		goto finish;
-	}
-
-	printf("Dumping EEPROM\n");
-	for (u32 i = 0; i < 512; i++) {
-		addr = i * 0x80;
-
-		if (!poke_eeprom_read(buf, addr, 0x80)) {
-			printf("\nError while reading EEPROM at 0x%04X\n", addr);
-			goto finish;
-		}
-
-		fwrite(buf, 1, 0x80, f);
-		progress_bar(i, 512, 25);
-	}
-	printf("Dump finished!\n");
-	printf("EEPROM dumped to PWEEPROM.bin\n");
-
+    u8 *image=malloc(0x10000u);
+    if(!image) { printf("Out of memory\n"); return; }
+    ir_enable();
+    if(!poke_init_session()) goto finish;
+    printf("Dumping EEPROM\n");
+    for(u32 a=0;a<0x10000u;a+=0x80) {
+        if(!poke_eeprom_read(image+a,(u16)a,0x80)) { printf("Read failed @%04lX. No file written.\n",(unsigned long)a); goto finish; }
+        progress_bar((int)(a+0x80),0x10000,25);
+    }
+    poke_packet disc; create_poke_packet(&disc,CMD_DISC,MASTER_EXTRA,NULL,0); send_pokepacket(&disc); ir_disable();
+    (void)mkdir("sdmc:/3ds",0700);
+    (void)mkdir("sdmc:/3ds/pwalkerHax",0700);
+    (void)mkdir("sdmc:/3ds/pwalkerHax/dumps",0700);
+    char path[160]; int fd=-1;
+    for(unsigned i=0;i<100 && fd<0;++i) {
+        snprintf(path,sizeof(path),"sdmc:/3ds/pwalkerHax/dumps/PWEEPROM-%lu-%u.bin",(unsigned long)time(NULL),i);
+        fd=open(path,O_WRONLY|O_CREAT|O_EXCL,0600);
+    }
+    if(fd<0) { printf("Cannot create dump file. Existing files preserved.\n"); goto finish; }
+    FILE *file=fdopen(fd,"wb");
+    if(!file) { close(fd); unlink(path); goto finish; }
+    bool ok=fwrite(image,1,0x10000u,file)==0x10000u;
+    if(fflush(file)) ok=false;
+    if(fclose(file)) ok=false;
+    if(ok) printf("EEPROM saved: %s\n",path);
+    else { unlink(path); printf("SD write failed. Incomplete file removed.\n"); }
 finish:
-	ir_disable();
-	fclose(f);
+    ir_disable(); free(image);
+}
+
+// Persist the live cache using the upstream firmware routine.
+bool poke_flush_health(void) {
+	set_watts(0);
+	return poke_upload_and_trigger_exploit(add_watts_payload, sizeof(add_watts_payload));
 }

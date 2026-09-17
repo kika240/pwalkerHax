@@ -1,0 +1,13 @@
+/build/
+/dist/
+*.3dsx
+*.elf
+*.smdh
+*.map
+*.bin
+*.eep
+*.eeprom
+*.rom
+*.pwe
+*.pws
+.DS_Store

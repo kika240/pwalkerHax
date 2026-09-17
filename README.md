@@ -1,4 +1,13 @@
-# pwalkerHax
+# pwalkerHax — selective save import fork
+
+This fork adds experimental import of edits created by Pokéwalker Studio.
+See the **[French import guide](docs/SAVE-IMPORT.fr.md)**, the
+[patch format](docs/PWEDIT1.md), and the new **Preview save edit** / **Import save edit** menus.
+The importer verifies device/walk identity, backs up EEPROM, limits writable fields,
+and reads changes back. Full raw EEPROM flashing is not offered. Physical 3DS/IR
+validation is still required; the protocol has been tested against emulated firmware.
+EEPROM dumps now use new dated filenames and preserve existing dumps.
+
 
 An hacking tool for the Pokewalker written as a 3DS homebrew application that uses the built-in infrared transceiver to communicate with the Pokewalker.
 

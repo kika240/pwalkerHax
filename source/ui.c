@@ -60,7 +60,9 @@ menu_entry main_menu_entries[] = {
 	{"Gift Pokemon", ENTRY_CHANGEMENU, .new_menu = &gift_pokemon_menu},
 	{"Gift item", ENTRY_CHANGEMENU, .new_menu = &gift_item_menu},
 	{"Dump ROM", ENTRY_ACTION, .callback = poke_dump_rom},
-	{"Dump EEPROM (user data)", ENTRY_ACTION, .callback = poke_dump_eeprom}
+	{"Dump EEPROM (user data)", ENTRY_ACTION, .callback = poke_dump_eeprom},
+	{"Preview save edit", ENTRY_ACTION, .callback = poke_preview_save_edit},
+	{"Import save edit (experimental)", ENTRY_ACTION, .callback = poke_import_save_edit}
 };
 
 menu main_menu = {

@@ -154,3 +154,17 @@ void poke_gift_item(u16 item);
 void poke_gift_pokemon(pokemon_data poke_data, pokemon_extradata poke_extra);
 void poke_dump_rom();
 void poke_dump_eeprom();
+
+// Shared transport for the selective save importer.
+void create_poke_packet(poke_packet *, u8, u8, const u8 *, u16);
+void send_pokepacket(poke_packet *);
+bool recv_pokepacket(poke_packet *);
+bool poke_init_session(void);
+bool poke_eeprom_write(u16, const void *, u16);
+bool poke_eeprom_read(void *, u16, u8);
+bool poke_upload_and_trigger_exploit(const u8 *, u16);
+void set_watts(u16);
+void poke_preview_save_edit(void);
+void poke_import_save_edit(void);
+
+bool poke_flush_health(void);

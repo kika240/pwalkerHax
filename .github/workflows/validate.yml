@@ -1,0 +1,26 @@
+name: Save edit validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./tests/run-tests.sh
+  build-3ds:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm
+    steps:
+      - uses: actions/checkout@v4
+      - run: make TARGET=pwalkerHax -j2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pwalkerHax-save-edit-experimental
+          path: |
+            pwalkerHax.3dsx
+            docs/SAVE-IMPORT.fr.md
+          if-no-files-found: error
